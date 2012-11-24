@@ -1,0 +1,60 @@
+/***
+ * Basic and by no means production ready styles.
+ */
+
+/* Some reset styles */
+#nav ul,
+#nav .menu-columns,
+#nav .menu-column {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    border: none;
+    padding: 0px;
+    margin: 0px;
+    width: auto;
+}
+
+#nav-wrapper {
+    position: relative;
+}
+
+#nav div {
+    position: static;
+    width: auto;
+    top: auto;
+    left: auto;
+    background: transparent;
+    padding: 0px;
+    border: none;
+}
+
+#nav li {
+    position: static;
+}
+
+#nav .menu-columns {
+    display: none;
+    position: absolute;
+    padding: 20px;
+    background: #FFF;
+    top: 60px;
+    left: 0px;
+}
+#nav .columns-3 {
+    width: 920px;
+}
+#nav .columns-2 {
+    width: 610px;
+}
+
+#nav .menu-column {
+    float: left;
+    width: 300px;
+    background: transparent;
+    margin-right: 10px;
+}
+#nav .menu-column.last {
+    margin-right: 0px;
+}

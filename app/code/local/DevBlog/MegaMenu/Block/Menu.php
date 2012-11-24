@@ -1,16 +1,24 @@
 <?php
 /**
- * DevBlog Mega Menu
  *
  *
  * @package    DevBlog_MegaMenu
- * @author     Ben (ben@dhmedia.com.au)
+ * @author     Ben (ben@devblog.com.au)
  */
 
 class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
 {
+    /* Keep track of our menu columns */
     private $menuColumns = array();
-    private $_descriptionLength = 200;
+
+    /* Maximum description length */
+    protected $descriptionLength = 200;
+
+    /* Max number of brands to display */
+    protected $numBrands = 10;
+
+    /* Manufacturer option values are cached */
+    protected static $manufacturerOptions = null;
 
     /**
      * Build the entire Mega Menu.
@@ -19,25 +27,28 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
      */
     public function getMegaMenu()
     {
-        return $this->_renderCategoryMenuHtml($this->getStoreCategories(), $level = 0);
+        return $this->_renderCategoryMenuHtml($this->getParentCategoryIds(), $level = 0);
     }
 
     /**
      * Renders a category array into a HTML UL list.
      *
-     * @param $categories
+     * @param int[] $categories
      * @param $level
      * @return string
      */
     protected function _renderCategoryMenuHtml($categories, $level)
     {
+        // Load all the categories.
+        $categories = $this->loadCategories($categories);
+
         $html = "";
         $activeCategories = array();
 
         // get all the active menu categories.
-        foreach ($categories as $activeCategory) {
-            if ($activeCategory->getIsActive()) {
-                $activeCategories[] = $activeCategory;
+        foreach ($categories as $cat) {
+            if ($cat->getIsActive() && $cat->getIncludeInMenu()) {
+                $activeCategories[] = $cat;
             }
         }
 
@@ -144,7 +155,6 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
         return $html;
     }
 
-
     /**
      * Add call back functions that generate a column Each callback will be called once
      * per top level menu item.
@@ -177,6 +187,43 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
     public function hasMenuColumns()
     {
         return count($this->menuColumns) > 0;
+    }
+
+    /**
+     * Get all the parent category ids.
+     *
+     * @return mixed
+     */
+    public function getParentCategoryIds()
+    {
+        // Get the root category Id.
+        $rootCatgoryId = Mage::app()->getWebsite(TRUE)->getDefaultStore()->getRootCategoryId();
+
+        // Load categories as a comma separated string.
+        $categoryIdsString = Mage::getModel('catalog/category')->load($rootCatgoryId)->getChildren();
+
+        return $categoryIdsString;
+    }
+
+    
+    /**
+     * @param $categoryIdsString
+     * @return array
+     */
+    public function loadCategories($categoryIdsString)
+    {
+        // Stores our loaded category objects.
+        $categories = array();
+
+        // get the arrya of Ids.
+        $categoryIds = explode(",", $categoryIdsString);
+
+        // Load the top level category objects.
+        foreach($categoryIds as $catId) {
+            $categories[] = Mage::getModel('catalog/category')->load($catId);
+        }
+
+        return $categories;
     }
 
 
@@ -255,8 +302,8 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
     }
 
     /**
-     * Get all the category brands.
-     *
+     * Displays all the brands related to a manufacturer. We're statically caching attribute options because of the
+     * performance overhead.
      *
      * @param $category
      * @return string $html
@@ -267,40 +314,98 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
         // some fields are not available.
         $fullCategory = Mage::getModel('catalog/category')->load($category->getId());
 
-        // Load the required category information and attributes.
-        $layer = Mage::getModel('catalog/layer');
-
-        $layer->setCurrentCategory($fullCategory);
-        $attributes = $layer->getFilterableAttributes();
-
-        // name of the attribute filter block.
-        $filterBlockName = 'catalog/layer_filter_attribute';
-
+        // This will be key value pairs of manufacturers that are linked to this category via products.
         $manufacturers = array();
-        foreach ($attributes as $attribute) {
-            if ($attribute->getAttributeCode() == 'manufacturer') {
-                $result = Mage::app('new')
-                    ->getLayout()
-                    ->createBlock($filterBlockName)
-                    ->setLayer($layer)
-                    ->setAttributeModel($attribute)
-                    ->init();
 
-                foreach ($result->getItems() as $option) {
-                    $manufacturers[$option->getValue()] = $option->getLabel();
+        // Load all the manufacturer attributes. This is cached in a static variable to prevent multiple loads.
+        $options = $this->getManufacturerOptions();
+
+
+        // Load the product collection.
+        $productCollection =
+            Mage::getResourceModel('catalog/product_collection')
+                ->addCategoryFilter($fullCategory)
+                ->addAttributeToSelect('manufacturer');
+
+        // Iterate products are retrieve manufacturer
+        foreach($productCollection as $product) {
+
+            // Get the manufacturer Id for this product.
+            $manufacturerId = $product->getManufacturer();
+
+            if(!empty($manufacturerId)) {
+                // If the manufacturer exists then increments the number of hits for this manufacturer
+                // otherwise add it for the first time.
+                if(array_key_exists($manufacturerId, $manufacturers)) {
+                    $manufacturers[$manufacturerId]['numHits']++;
+                }
+                else {
+                    $manufacturers[$manufacturerId] = array(
+                        'optionValue' => $options[$manufacturerId],
+                        'numHits' => 1,
+                    );
                 }
             }
         }
 
+        // Sort based on number of hits for the brand.
+        uasort($manufacturers, function($a, $b) {
+            if($a == $b) {
+                return 0;
+            }
+            return ($a['numHits'] > $b['numHits']) ? -1 : 1;
+        });
 
         // Initialise HTML
         $html = "";
-        $html .= "<ul>";
-        foreach ($manufacturers as $link => $man) {
-            $html .= "<li><a href='" . $fullCategory->getUrlPath() . "?manufacturer=" . $link . "'>$man</a></li>";
+        $counter = 1;
+        if(count($manufacturers) > 0) {
+
+            $html .= "<ul>";
+            foreach($manufacturers as $key => $man) {
+
+                $fullLink = Mage::getBaseUrl() . $fullCategory->getUrlPath(). "?manufacturer=". $key;
+
+                $html .= "<li><a href='" . $fullLink . "'>" . $man['optionValue']. "</a></li>";
+
+                // They want a limit on the number of brands to be displayed.
+                if($counter == self::BRAND_LIMIT) {
+                    break;
+                }
+                $counter++;
+            }
+            $html .= "</ul>";
         }
-        $html .= "</ul>";
 
         return $html;
+    }
+
+    /**
+     * We load all the attribute options for manufacturers and then sort them into
+     * key value pairs. This is called multiple times on a page laod the static variable
+     * is for performance.
+     *
+     * @return array
+     */
+    private function getManufacturerOptions()
+    {
+        // If its null then load it for the first time.
+        if(is_null(static::$manufacturerOptions)) {
+            $allOptions = Mage::getModel('eav/config')
+                ->getAttribute('catalog_product', 'manufacturer')
+                ->getSource()
+                ->getAllOptions();
+
+            // Initialise array.
+            static::$manufacturerOptions = array();
+
+            // re-order them now into key value pairs for quicker access later.
+            foreach($allOptions as $option) {
+                static::$manufacturerOptions[$option['value']] = $option['label'];
+            }
+        }
+
+        // Return our array.
+        return static::$manufacturerOptions;
     }
 }
