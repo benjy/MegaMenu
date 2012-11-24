@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <modules>
+        <DevBlog_MegaMenu>
+            <codePool>local</codePool>
+            <active>true</active>
+        </DevBlog_MegaMenu>
+    </modules>
+</config>
