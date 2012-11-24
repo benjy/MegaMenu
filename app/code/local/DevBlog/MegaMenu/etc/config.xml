@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <modules>
+        <DevBlog_MegaMenu>
+            <version>0.0.2</version>
+        </DevBlog_MegaMenu>
+    </modules>
+
+    <global>
+
+        <!-- Helpers -->
+        <helpers>
+            <megamenu>
+                <class>DevBlog_MegaMenu_Helper</class>
+            </megamenu>
+        </helpers>
+
+        <!-- Blocks -->
+        <blocks>
+            <megamenu>
+                <class>DevBlog_MegaMenu_Block</class>
+            </megamenu>
+        </blocks>
+
+        <models>
+            <megamenu>
+                <class>DevBlog_MegaMenu_Model</class>
+            </megamenu>
+        </models>
+
+        <resources>
+            <devblog_megamenu_setup>
+                <setup>
+                    <module>DevBlog_MegaMenu</module>
+                    <class>DevBlog_MegaMenu_Model_Mysql4_Setup</class>
+                </setup>
+                <connection>
+                    <use>core_setup</use>
+                </connection>
+            </devblog_megamenu_setup>
+        </resources>
+    </global>
+
+    <frontend>
+        <layout>
+            <updates>
+                <megamenu module="DevBlog_MegaMenu">
+                    <file>megamenu/megamenu.xml</file>
+                </megamenu>
+            </updates>
+        </layout>
+    </frontend>
+</config>

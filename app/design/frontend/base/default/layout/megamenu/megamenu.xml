@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<layout version="0.1.0">
+    <default module="megamenu">
+        <reference name="head">
+            <action method="addJs">
+                <name>megamenu/jquery-1-7-2.js</name>
+            </action>
+            <action method="addJs">
+                <name>megamenu/megamenu.js</name>
+            </action>
+            <action method="addCss">
+                <name>css/megamenu/megamenu.css</name>
+            </action>
+        </reference>
+
+        <reference name="header">
+            <block type="megamenu/menu" name="top.menu" as="topMenu" template="megamenu/menu.phtml">
+                <action method="addMenuColumns">
+                    <callback>getCategoryInfoColumn</callback>
+                    <callback>getChildCategoriesColumn</callback>
+                    <callback>getCategoryBrands</callback>
+                </action>
+            </block>
+        </reference>
+    </default>
+</layout>
