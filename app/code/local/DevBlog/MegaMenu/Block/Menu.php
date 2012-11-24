@@ -205,7 +205,7 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
         return $categoryIdsString;
     }
 
-    
+
     /**
      * @param $categoryIdsString
      * @return array
