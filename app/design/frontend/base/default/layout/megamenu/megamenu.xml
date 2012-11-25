@@ -14,13 +14,8 @@
         </reference>
 
         <reference name="header">
-            <block type="megamenu/menu" name="top.menu" as="topMenu" template="megamenu/menu.phtml">
-                <action method="addMenuColumns">
-                    <callback>getCategoryInfoColumn</callback>
-                    <callback>getChildCategoriesColumn</callback>
-                    <callback>getCategoryBrands</callback>
-                </action>
-            </block>
+            <!-- We're using the stand three columns. You could use type="megamenu/menu" and specify your own columns. -->
+            <block type="megamenu/ThreeColumns" name="top.menu" as="topMenu" template="megamenu/menu.phtml"/>
         </reference>
     </default>
 </layout>

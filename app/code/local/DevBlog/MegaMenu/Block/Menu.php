@@ -9,16 +9,10 @@
 class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
 {
     /* Keep track of our menu columns */
-    private $menuColumns = array();
+    protected  $menuColumns = array();
 
     /* Maximum description length */
     protected $descriptionLength = 200;
-
-    /* Max number of brands to display */
-    protected $numBrands = 10;
-
-    /* Manufacturer option values are cached */
-    protected static $manufacturerOptions = null;
 
     /**
      * Build the entire Mega Menu.
@@ -194,7 +188,7 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
      *
      * @return mixed
      */
-    public function getParentCategoryIds()
+    protected function getParentCategoryIds()
     {
         // Get the root category Id.
         $rootCatgoryId = Mage::app()->getWebsite(TRUE)->getDefaultStore()->getRootCategoryId();
@@ -210,7 +204,7 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
      * @param $categoryIdsString
      * @return array
      */
-    public function loadCategories($categoryIdsString)
+    protected function loadCategories($categoryIdsString)
     {
         // Stores our loaded category objects.
         $categories = array();
@@ -227,7 +221,7 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
     }
 
 
-    /******* Below functions should be in a child class that is using the above Mega Menu as a base ********/
+    /***** Provide some basic methods to build our columns *******/
 
     /**
      * Builds our sub-categories column for the menu navigation.
@@ -235,7 +229,7 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
      * @param $category
      * @return string
      */
-    protected function getChildCategoriesColumn($category)
+    protected function getChildCategoriesColumnHtml($category)
     {
         $level = 1;
         $html = "";
@@ -255,19 +249,23 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
         return $html;
     }
 
-
-    protected function getCategoryInfoColumn($category)
+    /**
+     * Display the category name and information.
+     *
+     * @TODO add an option to display the category image.
+     *
+     * @param $category
+     * @return string
+     */
+    protected function getCategoryInfoColumnHtml($category)
     {
         // Reload the entire category object because it's only been lazy loaded by Magento and
         // some fields are not available.
         $fullCategory = Mage::getModel('catalog/category')->load($category->getId());
 
-        //$categoryMenuImage = Mage::helper('images')->resizeCategoryImage($fullCategory, 260, 105, $imageSize = "large", $imageType = "thumb");
-        $categoryMenuImage = '';
         $html = "";
         $html .= "<h2>" . $fullCategory->getName() . "</h2>";
         $html .= "<p>" . $this->getDescription($fullCategory) . "</p>";
-        $html .= "<div class='menu-img'><img src='" . $categoryMenuImage . "' alt='' /></div>";
 
         return $html;
     }
@@ -284,128 +282,21 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
 
         if ($category->getMegaMenuDescription()) {
             $categoryDescription = $category->getMegaMenuDescription();
-        } else {
+        }
+        else {
             $categoryDescription = $category->getDescription();
 
-            // Trim the description down.
+            // Try trim the description down to the first sentence.
             if (strpos($categoryDescription, ".") !== FALSE) {
                 $categoryDescription = substr($categoryDescription, 0, strpos($categoryDescription, ".") + 1); // first fullStop
             }
-            // still too long, trim it down, using word boundry
-            if (strlen($categoryDescription) > $this->_descriptionLength) {
-                $categoryDescription = wordwrap($categoryDescription, $this->_descriptionLength);
+            // still too long, trim it down, using word boundary
+            if (strlen($categoryDescription) > $this->descriptionLength) {
+                $categoryDescription = wordwrap($categoryDescription, $this->descriptionLength);
                 $categoryDescription = substr($categoryDescription, 0, strpos($categoryDescription, "\n"));
             }
         }
 
         return $categoryDescription;
-    }
-
-    /**
-     * Displays all the brands related to a manufacturer. We're statically caching attribute options because of the
-     * performance overhead.
-     *
-     * @param $category
-     * @return string $html
-     */
-    protected function getCategoryBrands($category)
-    {
-        // Reload the entire category object because it's only been lazy loaded by Magento and
-        // some fields are not available.
-        $fullCategory = Mage::getModel('catalog/category')->load($category->getId());
-
-        // This will be key value pairs of manufacturers that are linked to this category via products.
-        $manufacturers = array();
-
-        // Load all the manufacturer attributes. This is cached in a static variable to prevent multiple loads.
-        $options = $this->getManufacturerOptions();
-
-
-        // Load the product collection.
-        $productCollection =
-            Mage::getResourceModel('catalog/product_collection')
-                ->addCategoryFilter($fullCategory)
-                ->addAttributeToSelect('manufacturer');
-
-        // Iterate products are retrieve manufacturer
-        foreach($productCollection as $product) {
-
-            // Get the manufacturer Id for this product.
-            $manufacturerId = $product->getManufacturer();
-
-            if(!empty($manufacturerId)) {
-                // If the manufacturer exists then increments the number of hits for this manufacturer
-                // otherwise add it for the first time.
-                if(array_key_exists($manufacturerId, $manufacturers)) {
-                    $manufacturers[$manufacturerId]['numHits']++;
-                }
-                else {
-                    $manufacturers[$manufacturerId] = array(
-                        'optionValue' => $options[$manufacturerId],
-                        'numHits' => 1,
-                    );
-                }
-            }
-        }
-
-        // Sort based on number of hits for the brand.
-        uasort($manufacturers, function($a, $b) {
-            if($a == $b) {
-                return 0;
-            }
-            return ($a['numHits'] > $b['numHits']) ? -1 : 1;
-        });
-
-        // Initialise HTML
-        $html = "";
-        $counter = 1;
-        if(count($manufacturers) > 0) {
-
-            $html .= "<ul>";
-            foreach($manufacturers as $key => $man) {
-
-                $fullLink = Mage::getBaseUrl() . $fullCategory->getUrlPath(). "?manufacturer=". $key;
-
-                $html .= "<li><a href='" . $fullLink . "'>" . $man['optionValue']. "</a></li>";
-
-                // They want a limit on the number of brands to be displayed.
-                if($counter == self::BRAND_LIMIT) {
-                    break;
-                }
-                $counter++;
-            }
-            $html .= "</ul>";
-        }
-
-        return $html;
-    }
-
-    /**
-     * We load all the attribute options for manufacturers and then sort them into
-     * key value pairs. This is called multiple times on a page laod the static variable
-     * is for performance.
-     *
-     * @return array
-     */
-    private function getManufacturerOptions()
-    {
-        // If its null then load it for the first time.
-        if(is_null(static::$manufacturerOptions)) {
-            $allOptions = Mage::getModel('eav/config')
-                ->getAttribute('catalog_product', 'manufacturer')
-                ->getSource()
-                ->getAllOptions();
-
-            // Initialise array.
-            static::$manufacturerOptions = array();
-
-            // re-order them now into key value pairs for quicker access later.
-            foreach($allOptions as $option) {
-                static::$manufacturerOptions[$option['value']] = $option['label'];
-            }
-        }
-
-        // Return our array.
-        return static::$manufacturerOptions;
     }
 }
