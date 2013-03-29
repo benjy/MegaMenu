@@ -101,7 +101,7 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
     protected function _renderCategoryItemHtml($category, $level, $isFirst, $isLast) {
         // Build li css classe.
         $li_classes = "level" . $level;
-        $li_classes .= ($level == 0) ? ' parent level-top testing' : '';
+        $li_classes .= ($level == 0) ? ' parent level-top' : '';
         $li_classes .= ($isFirst) ? ' first' : '';
         $li_classes .= ($isLast) ? ' last' : '';
         $li_classes .= ($this->isCategoryActive($category)) ? ' active' : '';
