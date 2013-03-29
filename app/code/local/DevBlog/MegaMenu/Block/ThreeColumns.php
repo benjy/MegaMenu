@@ -25,7 +25,10 @@ class DevBlog_MegaMenu_Block_ThreeColumns extends DevBlog_MegaMenu_Block_Menu
             'getChildCategoriesColumnHtml',
             'getCategoryBrandsHtml',
         ));
+
+        parent::__construct();
     }
+
 
     /**
      * Displays all the brands related to a manufacturer. We're statically caching attribute options because of the

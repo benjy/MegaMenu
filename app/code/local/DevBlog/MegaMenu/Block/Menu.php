@@ -14,48 +14,68 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
     /* Maximum description length */
     protected $descriptionLength = 200;
 
+    protected $_categoryModel = null;
+
+    public function __construct() {
+        $this->addData(array(
+            'cache_lifetime'    => 3600,
+            'cache_tags'    => array(Mage_Cms_Model_Block::CACHE_TAG)
+        ));
+    }
+
+
     /**
      * Build the entire Mega Menu.
      *
      * @return string
      */
-    public function getMegaMenu()
-    {
-        return $this->_renderCategoryMenuHtml($this->getParentCategoryIds(), $level = 0);
+    public function getMegaMenu() {
+        return $this->_renderCategoryMenuHtml(Mage::app()->getStore()->getRootCategoryId(), $level = 0);
     }
 
     /**
      * Renders a category array into a HTML UL list.
      *
-     * @param int[] $categories
-     * @param $level
+     * @param int $topLevelCatId
+     * @param int $level
      * @return string
      */
-    protected function _renderCategoryMenuHtml($categories, $level)
-    {
-        // Load all the categories.
-        $categories = $this->loadCategories($categories);
+    protected function _renderCategoryMenuHtml($topLevelCatId, $level) {
+
+        if(is_null($this->_categoryModel)) {
+            $this->_categoryModel = Mage::getModel('catalog/category');
+        }
+
+        $treeModel = $this->_categoryModel->getTreeModel()->loadNode($topLevelCatId);
+        $nodes = $treeModel->loadChildren()->getChildren();
+
+        $nodeIds = array();
+        foreach ($nodes as $node) {
+            $nodeIds[] = $node->getId();
+        }
+
+        $collection = $this->_categoryModel->getCollection()
+            ->addAttributeToSelect('url_key')
+            ->addAttributeToSelect('name')
+            ->addAttributeToSelect('is_anchor')
+            ->addAttributeToFilter('is_active', 1)
+            ->addAttributeToFilter('include_in_menu', 1)
+            ->addIdFilter($nodeIds)
+            ->addAttributeToSort('entity_id')
+            ->load();
+
 
         $html = "";
-        $activeCategories = array();
-
-        // get all the active menu categories.
-        foreach ($categories as $cat) {
-            if ($cat->getIsActive() && $cat->getIncludeInMenu()) {
-                $activeCategories[] = $cat;
-            }
-        }
 
         // counter inside the loop
         $index = 0;
 
         // Get the category count.
-        $count = count($activeCategories);
+        $count = $collection->count();
 
         // Pull out all active top level categories.
-        foreach ($activeCategories as $category) {
+        foreach ($collection as $category) {
 
-            // increment counter.
             $index++;
 
             // Calculate if its first or last.
@@ -64,7 +84,6 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
 
             // Render this item.
             $html .= $this->_renderCategoryItemHtml($category, $level, $isFirst, $isLast);
-
         }
 
         return $html;
@@ -79,11 +98,10 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
      * @param $isLast
      * @return string
      */
-    protected function _renderCategoryItemHtml($category, $level, $isFirst, $isLast)
-    {
+    protected function _renderCategoryItemHtml($category, $level, $isFirst, $isLast) {
         // Build li css classe.
         $li_classes = "level" . $level;
-        $li_classes .= ($level == 0) ? ' parent level-top' : '';
+        $li_classes .= ($level == 0) ? ' parent level-top testing' : '';
         $li_classes .= ($isFirst) ? ' first' : '';
         $li_classes .= ($isLast) ? ' last' : '';
         $li_classes .= ($this->isCategoryActive($category)) ? ' active' : '';
@@ -98,10 +116,12 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
             $a_classes = " level-top";
         }
 
-        $html = "";
-        $html .= "<li class='" . $li_classes . "'>
-                     <a class='" . $a_classes . "' href='" . $this->getCategoryUrl($category) . "'>
-                     <span>" . $category->getName() . "</span></a>";
+        $html = "
+            <li class='" . $li_classes . "'>
+                <a class='" . $a_classes . "' href='" . $this->getCategoryUrl($category) . "'>
+                     <span>" . $category->getName() . "</span>
+            </a>
+        ";
 
 
         if ($this->hasMenuColumns()) {
@@ -121,8 +141,7 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
      * @param $category
      * @return string
      */
-    protected function getMenuColumnsHtml($category)
-    {
+    protected function getMenuColumnsHtml($category) {
         $html = "";
         $isFirst = true;
         $count = count($this->menuColumns);
@@ -155,69 +174,32 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
      *
      * @param $menuColumnCallback
      */
-    public function addMenuColumn($menuColumnCallback)
-    {
+    public function addMenuColumn($menuColumnCallback) {
         $this->menuColumns[] = $menuColumnCallback;
     }
 
     /**
      * Allows you to add multiple columns at once for ease of use.
+     *
      * @param $menuColumnCallbacks
      */
-    public function addMenuColumns($menuColumnCallbacks)
-    {
+    public function addMenuColumns($menuColumnCallbacks) {
         if (is_array($menuColumnCallbacks)) {
 
             $this->menuColumns = $this->menuColumns + $menuColumnCallbacks;
-        } else {
+        }
+        else {
             $this->addMenuColumn($menuColumnCallbacks);
         }
     }
 
     /**
-     * If this menu is to have a drop down with columns.
+     * If this menu has columns.
+     *
      * @return bool
      */
-    public function hasMenuColumns()
-    {
+    public function hasMenuColumns() {
         return count($this->menuColumns) > 0;
-    }
-
-    /**
-     * Get all the parent category ids.
-     *
-     * @return mixed
-     */
-    protected function getParentCategoryIds()
-    {
-        // Get the root category Id.
-        $rootCatgoryId = Mage::app()->getWebsite(TRUE)->getDefaultStore()->getRootCategoryId();
-
-        // Load categories as a comma separated string.
-        $categoryIdsString = Mage::getModel('catalog/category')->load($rootCatgoryId)->getChildren();
-
-        return $categoryIdsString;
-    }
-
-
-    /**
-     * @param $categoryIdsString
-     * @return array
-     */
-    protected function loadCategories($categoryIdsString)
-    {
-        // Stores our loaded category objects.
-        $categories = array();
-
-        // get the arrya of Ids.
-        $categoryIds = explode(",", $categoryIdsString);
-
-        // Load the top level category objects.
-        foreach($categoryIds as $catId) {
-            $categories[] = Mage::getModel('catalog/category')->load($catId);
-        }
-
-        return $categories;
     }
 
 
@@ -229,8 +211,7 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
      * @param $category
      * @return string
      */
-    protected function getChildCategoriesColumnHtml($category)
-    {
+    protected function getChildCategoriesColumnHtml($category) {
         $level = 1;
         $html = "";
         if ($category->hasChildren()) {
@@ -240,7 +221,7 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
             $level++;
 
             // Render the child menu.
-            $html .= $this->_renderCategoryMenuHtml($category->getChildren(), $level);
+            $html .= $this->_renderCategoryMenuHtml($category->getId(), $level);
 
             // End child menu item.
             $html .= "</ul>";
@@ -257,8 +238,7 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
      * @param $category
      * @return string
      */
-    protected function getCategoryInfoColumnHtml($category)
-    {
+    protected function getCategoryInfoColumnHtml($category) {
         // Reload the entire category object because it's only been lazy loaded by Magento and
         // some fields are not available.
         $fullCategory = Mage::getModel('catalog/category')->load($category->getId());
@@ -277,8 +257,7 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
      * @param object $category
      * @return string
      */
-    private function getDescription($category)
-    {
+    protected function getDescription($category) {
 
         if ($category->getMegaMenuDescription()) {
             $categoryDescription = $category->getMegaMenuDescription();
@@ -288,10 +267,13 @@ class DevBlog_MegaMenu_Block_Menu extends Mage_Catalog_Block_Navigation
 
             // Try trim the description down to the first sentence.
             if (strpos($categoryDescription, ".") !== FALSE) {
-                $categoryDescription = substr($categoryDescription, 0, strpos($categoryDescription, ".") + 1); // first fullStop
+
+                // first fullStop
+                $categoryDescription = substr($categoryDescription, 0, strpos($categoryDescription, ".") + 1);
             }
             // still too long, trim it down, using word boundary
             if (strlen($categoryDescription) > $this->descriptionLength) {
+
                 $categoryDescription = wordwrap($categoryDescription, $this->descriptionLength);
                 $categoryDescription = substr($categoryDescription, 0, strpos($categoryDescription, "\n"));
             }
